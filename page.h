@@ -1,3 +1,11 @@
+/*
+* Team number: 39
+* Group Members:
+*   Name: David Li, ID: 908 313 4198
+*   Name: Wei Wei, ID: 
+*   Name: Ziqin Shen, ID: 
+*/
+
 #ifndef PAGE_H
 #define PAGE_H
 

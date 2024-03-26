@@ -1,3 +1,11 @@
+/*
+* Team number: 39
+* Group Members:
+*   Name: David Li, ID: 908 313 4198
+*   Name: Wei Wei, ID: 
+*   Name: Ziqin Shen, ID: 
+*/
+
 #include <memory.h>
 #include <unistd.h>
 #include <errno.h>

@@ -2,7 +2,7 @@
 * Team number: 39
 * Group Members:
 *   Name: David Li, ID: 908 313 4198
-*   Name: Wei Wei, ID: 
+*   Name: Wei Wei, ID: 908 354 2150
 *   Name: Ziqin Shen, ID: 
 */
 
@@ -20,7 +20,8 @@
 
 int BufHashTbl::hash(const File* file, const int pageNo)
 {
-  int tmp, value;
+  int value;
+  long tmp;
   tmp = (long)file;  // cast of pointer to the file object to an integer
   value = (tmp + pageNo) % HTSIZE;
   return value;

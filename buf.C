@@ -73,11 +73,22 @@ BufMgr::~BufMgr() {
 
 const Status BufMgr::allocBuf(int & frame) 
 {
-
-
-
-
-
+    for(int i = 0; i < this.numBufs; i++){
+        this.advanceClock();
+        auto desc = this.BufDesc[this.clockHand];
+        if(!desc.valid){
+            //Set()
+        }
+        if(desc.refBit){
+            //clear refBit
+            continue;
+        }
+        if(desc.pinCnt!=0){
+            continue;
+        }
+        
+    }
+    return OK;
 
 }
 

@@ -11,7 +11,7 @@
 
 #include "db.h"
 // define if debug output wanted
-//#define DEBUGBUF
+// #define DEBUGBUF
 
 // declarations for buffer pool hash table
 struct hashBucket

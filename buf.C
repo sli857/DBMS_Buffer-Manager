@@ -146,8 +146,8 @@ const Status BufMgr::readPage(File *file, const int PageNo, Page *&page)
     //case 2
     if(lookupResult == OK){
         ASSERT(frameNo!=-1);
-        bufTable->refbit = true;
-        bufTable->pinCnt++;
+        bufTable[frameNo].refbit = true;
+        bufTable[frameNo].pinCnt++;
         page = &bufPool[frameNo];
         return OK;
     }

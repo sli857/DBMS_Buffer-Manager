@@ -85,7 +85,7 @@ Make sure that if the buffer frame allocated has a valid page in it, that you
 remove the appropriate entry from the hash table.*/
 const Status BufMgr::allocBuf(int &frame)
 {
-    for (int i = 0; i < numBufs; i++)
+    for (int i = 0; i < numBufs * 2; i++)
     {
         advanceClock();
         auto target_desc = bufTable[clockHand];
@@ -97,7 +97,6 @@ const Status BufMgr::allocBuf(int &frame)
         if (target_desc.refbit)
         {
             target_desc.refbit = false;
-            continue;
         }
         if (target_desc.pinCnt > 0)
         {
@@ -116,7 +115,6 @@ const Status BufMgr::allocBuf(int &frame)
             }
         }
         frame = target_desc.frameNo;
-        printSelf();
         return OK;
     }
     return BUFFEREXCEEDED;
@@ -212,11 +210,12 @@ const Status BufMgr::allocPage(File *file, int &pageNo, Page *&page)
     // readPage(file,pageNo,page);
 
     // allocate page
-    auto allocatePageresult = file->allocatePage(pageNo);
+    int pageNum{-1};
+    auto allocatePageresult = file->allocatePage(pageNum);
     if(allocatePageresult != OK){
         return allocatePageresult;
     }
-    ASSERT(pageNo != -1);
+    ASSERT(pageNum != -1);
 
     // alloc buf frame
     int frameNo {-1};
@@ -227,11 +226,12 @@ const Status BufMgr::allocPage(File *file, int &pageNo, Page *&page)
     ASSERT(frameNo != -1);
 
     // insert into hashtable
-    auto insertResult = hashTable->insert(file, pageNo, frameNo);
+    auto insertResult = hashTable->insert(file, pageNum, frameNo);
     if(insertResult != OK){
         return insertResult;
     }
-    bufTable[frameNo].Set(file, pageNo);
+    bufTable[frameNo].Set(file, pageNum);
+    pageNo = pageNum;
     page = &bufPool[frameNo];
     return OK;
 }

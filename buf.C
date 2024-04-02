@@ -82,30 +82,37 @@ const Status BufMgr::allocBuf(int & frame)
 
     while(!allocatedPage)
     {
+        //move forward the clock hand
+        advanceClock();
+
+        if(pointer == clockHand && allocatedPage){
+            return BUFFEREXCEEDED; // all buffer frames are pinned
+        }
+        
         if(bufTable[clockHand].pinCnt == 0){// whether the frame is pinned
             if(bufTable[clockHand].refbit){// whether the frame is referenced
                 bufTable[clockHand].refbit = false; // unset the reference bit
             }else{ // a found free frame
-                allocatedPage = true;
+
+                if(bufTable[clockHand].valid){
+                    if(bufTable[clockHand].dirty){
+                        Status ioStatus = bufTable[clockHand].file ->writePage(bufTable[clockHand].pageNo, &bufPool[clockHand]);
+                        if(ioStatus != OK){
+                            return UNIXERR; // catch error
+                        }
+                        bufStats.diskwrites++; //write a dirty page back to disk successfully
+                        bufTable[clockHand].dirty = false; //Reset the dirty bit
+                    }
+                }
+
+                if(bufTable[clockHand].valid){
+                    hashTable ->remove(bufTable[clockHand].file, bufTable[clockHand].pageNo);
+                }
+
                 frame = clockHand;
+                allocatedPage = true;
+                break;
             }
-        }
-        
-        //move forward the clock hand
-        advanceClock();
-    }
-
-    if(pointer == clockHand){
-        return BUFFEREXCEEDED; // all buffer frames are pinned
-    }
-
-    if(bufTable[frame].valid){
-        if(bufTable[frame].dirty){
-            Status ioStatus = bufTable[frame].file ->writePage(bufTable->pageNo, &bufPool[frame]);
-            if(ioStatus != OK){
-                return UNIXERR; // catch error
-            }
-            bufStats.diskwrites++; //write a dirty page back to disk successfully
         }
     }
 
@@ -149,10 +156,7 @@ const Status BufMgr::readPage(File* file, const int PageNo, Page*& page)
             return UNIXERR;
         }
         //insert page into hashtable
-        status = hashTable ->insert(file, PageNo, frameNo);
-        if(status != OK){
-            return HASHTBLERROR;
-        }
+        hashTable ->insert(file, PageNo, frameNo);
         //set the frame
         bufTable[frameNo].Set(file, PageNo);
     }else if(status == OK){ // Case 2: page is in the buffer pool
@@ -180,13 +184,13 @@ const Status BufMgr::unPinPage(File* file, const int PageNo,
 
     Status status = hashTable ->lookup(file , PageNo, frameNo);
     //page is not in the buffer pool
-    if(status == HASHNOTFOUND){
+    if(status != OK){
         return HASHNOTFOUND;
     }
     //get BufDesc of frame
     BufDesc& frameDesc = bufTable[frameNo];
     //the pin count for the frame is already 0
-    if(frameDesc.pinCnt == 0){
+    if(frameDesc.pinCnt <= 0){
         return PAGENOTPINNED;
     }
     //decrements the pin count of the frame
@@ -219,6 +223,7 @@ const Status BufMgr::allocPage(File* file, int& pageNo, Page*& page)
     status = allocBuf(frameNo);
     if(status != OK){
         if(status == BUFFEREXCEEDED){
+            file->disposePage(pageNo);
             return BUFFEREXCEEDED;
         }else{
             return status;
@@ -234,7 +239,6 @@ const Status BufMgr::allocPage(File* file, int& pageNo, Page*& page)
     //the page number of the newly allocated page
     page = &bufPool[frameNo];
 
-    // return file->readPage(pageNo, page);
     return OK;
 }
 

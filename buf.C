@@ -85,32 +85,50 @@ Make sure that if the buffer frame allocated has a valid page in it, that you
 remove the appropriate entry from the hash table.*/
 const Status BufMgr::allocBuf(int &frame)
 {
+    //count iterations
     int count{0};
+    //count pinned frames
     int pinned{0};
+
     do
     {
+        // iterate all frames and all frames are pinned
         if (count == numBufs && pinned == numBufs)
         {
             return BUFFEREXCEEDED;
         }
+
+        // increment
         count++;
         advanceClock();
+
+        // store a pointer to current frame
         BufDesc *target_desc = &bufTable[clockHand];
+
+        // page of the frame is invalid, use directly
         if (!target_desc->valid)
         {
             frame = target_desc->frameNo;
             return OK;
         }
+
+        // checked pinned?
         if (target_desc->pinCnt > 0)
         {
             pinned++;
             continue;
         }
+
+        // check ref? decrement if true
         if (target_desc->refbit)
         {
             target_desc->refbit = false;
             continue;
         }
+
+        // current frame is good to be replaced if code runs up to here
+
+        // check dirty? write back to disk if true
         if (target_desc->dirty)
         {
             // write this page to disk
@@ -126,11 +144,9 @@ const Status BufMgr::allocBuf(int &frame)
         if (target_desc->file != nullptr)
         {
             hashTable->remove(target_desc->file, target_desc->pageNo);
-            // if (removeResult != OK)
-            // {
-            //     return removeResult;
-            // }
         }
+        
+        // set the parameter frame to current frame
         frame = target_desc->frameNo;
         return OK;
     } while (true);
@@ -156,13 +172,15 @@ BUFFEREXCEEDED if all buffer frames are pinned, HASHTBLERROR if a hash table
 error occurred.*/
 const Status BufMgr::readPage(File *file, const int PageNo, Page *&page)
 {
+
+    // look up page from hashtable
     int frameNo{-1};
     auto lookupResult = hashTable->lookup(file, PageNo, frameNo);
 
-    // case 1
+    // case 1: not found
     if (lookupResult == HASHNOTFOUND)
     {
-        // std::cout<<"not found"<<endl;
+
         auto allocResult = allocBuf(frameNo);
         if (allocResult == OK)
         {
@@ -184,7 +202,7 @@ const Status BufMgr::readPage(File *file, const int PageNo, Page *&page)
         return allocResult;
     }
 
-    // case 2
+    // case 2: found
     else if (lookupResult == OK)
     {
         ASSERT(frameNo != -1);
@@ -205,6 +223,7 @@ already 0.*/
 const Status BufMgr::unPinPage(File *file, const int PageNo,
                                const bool dirty)
 {
+    
     int frameNo{-1};
     auto lookupResult = hashTable->lookup(file, PageNo, frameNo);
     if (lookupResult != OK)

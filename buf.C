@@ -85,7 +85,7 @@ Make sure that if the buffer frame allocated has a valid page in it, that you
 remove the appropriate entry from the hash table.*/
 const Status BufMgr::allocBuf(int &frame)
 {
-    for (int i = 0; i < numBufs * 2; i++)
+    for (int i = 0; i < numBufs; i++)
     {
         advanceClock();
         auto target_desc = bufTable[clockHand];
@@ -109,6 +109,7 @@ const Status BufMgr::allocBuf(int &frame)
             if(writeResult != OK){
                 return writeResult;
             }
+            // remove from hashtable
             auto removeResult = hashTable->remove(target_desc.file, target_desc.pageNo);
             if(removeResult != OK){
                 return removeResult;
@@ -141,20 +142,17 @@ const Status BufMgr::readPage(File *file, const int PageNo, Page *&page)
 {
     int frameNo{-1};
     auto lookupResult = hashTable->lookup(file, PageNo, frameNo);
-    //case 2
-    if(lookupResult == OK){
-        ASSERT(frameNo!=-1);
-        bufTable[frameNo].refbit = true;
-        bufTable[frameNo].pinCnt++;
-        page = &bufPool[frameNo];
-        return OK;
-    }
+
     //case 1
-    else if(lookupResult == HASHNOTFOUND){
+    if(lookupResult == HASHNOTFOUND){
         // std::cout<<"not found"<<endl;
         auto allocResult = allocBuf(frameNo);
         if(allocResult == OK){
-            file->readPage(PageNo, page);
+            ASSERT(frameNo != -1);
+            auto readPageResult = file->readPage(PageNo, &bufPool[frameNo]);
+            if(readPageResult != OK){
+                return readPageResult;
+            }
             auto insertResult = hashTable->insert(file, PageNo, frameNo);
             if(insertResult == OK){
                 bufTable[frameNo].Set(file, PageNo);
@@ -165,7 +163,17 @@ const Status BufMgr::readPage(File *file, const int PageNo, Page *&page)
         }
         return allocResult;
     }
-    return OK;
+
+    //case 2
+    else if(lookupResult == OK){
+        ASSERT(frameNo!=-1);
+        bufTable[frameNo].refbit = true;
+        bufTable[frameNo].pinCnt++;
+        page = &bufPool[frameNo];
+        return OK;
+    }
+
+    return lookupResult;
 }
 
 /*
@@ -307,6 +315,8 @@ void BufMgr::printSelf(void)
 
         if (tmpbuf->valid == true)
             cout << "\tvalid\n";
+        if (tmpbuf->refbit == true)
+            cout << "\tref\n";
         cout << endl;
-    };
+    }
 }

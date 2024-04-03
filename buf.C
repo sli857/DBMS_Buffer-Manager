@@ -106,16 +106,23 @@ const Status BufMgr::allocBuf(int &frame)
         {
             // write this page to disk
             auto writeResult = target_desc.file->writePage(target_desc.pageNo, &bufPool[clockHand]);
-            if(writeResult != OK){
+            if (writeResult != OK)
+            {
                 return writeResult;
             }
-            // remove from hashtable
+        }
+
+        frame = target_desc.frameNo;
+        // remove from hashtable if there is already a valid page
+        if (target_desc.file != nullptr)
+        {
             auto removeResult = hashTable->remove(target_desc.file, target_desc.pageNo);
-            if(removeResult != OK){
+            if (removeResult != OK)
+            {
                 return removeResult;
             }
         }
-        frame = target_desc.frameNo;
+
         return OK;
     }
     return BUFFEREXCEEDED;
@@ -143,18 +150,22 @@ const Status BufMgr::readPage(File *file, const int PageNo, Page *&page)
     int frameNo{-1};
     auto lookupResult = hashTable->lookup(file, PageNo, frameNo);
 
-    //case 1
-    if(lookupResult == HASHNOTFOUND){
+    // case 1
+    if (lookupResult == HASHNOTFOUND)
+    {
         // std::cout<<"not found"<<endl;
         auto allocResult = allocBuf(frameNo);
-        if(allocResult == OK){
+        if (allocResult == OK)
+        {
             ASSERT(frameNo != -1);
             auto readPageResult = file->readPage(PageNo, &bufPool[frameNo]);
-            if(readPageResult != OK){
+            if (readPageResult != OK)
+            {
                 return readPageResult;
             }
             auto insertResult = hashTable->insert(file, PageNo, frameNo);
-            if(insertResult == OK){
+            if (insertResult == OK)
+            {
                 bufTable[frameNo].Set(file, PageNo);
                 page = &bufPool[frameNo];
                 return OK;
@@ -164,9 +175,10 @@ const Status BufMgr::readPage(File *file, const int PageNo, Page *&page)
         return allocResult;
     }
 
-    //case 2
-    else if(lookupResult == OK){
-        ASSERT(frameNo!=-1);
+    // case 2
+    else if (lookupResult == OK)
+    {
+        ASSERT(frameNo != -1);
         bufTable[frameNo].refbit = true;
         bufTable[frameNo].pinCnt++;
         page = &bufPool[frameNo];
@@ -186,15 +198,18 @@ const Status BufMgr::unPinPage(File *file, const int PageNo,
 {
     int frameNo{-1};
     auto lookupResult = hashTable->lookup(file, PageNo, frameNo);
-    if(lookupResult != OK){
+    if (lookupResult != OK)
+    {
         return HASHNOTFOUND;
     }
     ASSERT(frameNo != -1);
-    if(bufTable[frameNo].pinCnt == 0){
+    if (bufTable[frameNo].pinCnt == 0)
+    {
         return PAGENOTPINNED;
     }
     bufTable[frameNo].pinCnt--;
-    if(dirty == true){
+    if (dirty == true)
+    {
         bufTable[frameNo].dirty = true;
     }
     return OK;
@@ -212,30 +227,28 @@ BUFFEREXCEEDED if all buffer frames are pinned and HASHTBLERROR if a hash table
 error occurred. */
 const Status BufMgr::allocPage(File *file, int &pageNo, Page *&page)
 {
-    // int frame;
-    // allocBuf(frame);
-    // std::cout<<frame<<endl;
-    // readPage(file,pageNo,page);
-
     // allocate page
     int pageNum{-1};
     auto allocatePageresult = file->allocatePage(pageNum);
-    if(allocatePageresult != OK){
+    if (allocatePageresult != OK)
+    {
         return allocatePageresult;
     }
     ASSERT(pageNum != -1);
 
     // alloc buf frame
-    int frameNo {-1};
+    int frameNo{-1};
     auto allocBufResult = allocBuf(frameNo);
-    if(allocBufResult != OK){
+    if (allocBufResult != OK)
+    {
         return allocBufResult;
     }
     ASSERT(frameNo != -1);
 
     // insert into hashtable
     auto insertResult = hashTable->insert(file, pageNum, frameNo);
-    if(insertResult != OK){
+    if (insertResult != OK)
+    {
         return insertResult;
     }
     bufTable[frameNo].Set(file, pageNum);
@@ -313,10 +326,11 @@ void BufMgr::printSelf(void)
         cout << i << "\t" << (char *)(&bufPool[i])
              << "\tpinCnt: " << tmpbuf->pinCnt;
 
+        if (tmpbuf->refbit == true)
+            cout << "\tref";
+
         if (tmpbuf->valid == true)
             cout << "\tvalid\n";
-        if (tmpbuf->refbit == true)
-            cout << "\tref\n";
         cout << endl;
     }
 }

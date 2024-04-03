@@ -223,19 +223,27 @@ already 0.*/
 const Status BufMgr::unPinPage(File *file, const int PageNo,
                                const bool dirty)
 {
-    
+    // look up page in hastTable
     int frameNo{-1};
     auto lookupResult = hashTable->lookup(file, PageNo, frameNo);
+
+    // not found
     if (lookupResult != OK)
     {
         return HASHNOTFOUND;
     }
     ASSERT(frameNo != -1);
+
+    // not pinned
     if (bufTable[frameNo].pinCnt == 0)
     {
         return PAGENOTPINNED;
     }
+
+    // decrement pin
     bufTable[frameNo].pinCnt--;
+
+    // update dirty
     if (dirty == true)
     {
         bufTable[frameNo].dirty = true;

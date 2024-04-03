@@ -85,48 +85,57 @@ Make sure that if the buffer frame allocated has a valid page in it, that you
 remove the appropriate entry from the hash table.*/
 const Status BufMgr::allocBuf(int &frame)
 {
-    for (int i = 0; i < numBufs; i++)
+    int count{0};
+    int pinned{0};
+    do
     {
-        advanceClock();
-        auto target_desc = bufTable[clockHand];
-        if (!target_desc.valid)
+        if (count == numBufs && pinned == numBufs)
         {
-            frame = target_desc.frameNo;
+            return BUFFEREXCEEDED;
+        }
+        count++;
+        advanceClock();
+        BufDesc *target_desc = &bufTable[clockHand];
+        if (!target_desc->valid)
+        {
+            frame = target_desc->frameNo;
             return OK;
         }
-        if (target_desc.refbit)
+        if (target_desc->pinCnt > 0)
         {
-            target_desc.refbit = false;
-        }
-        if (target_desc.pinCnt > 0)
-        {
+            pinned++;
             continue;
         }
-        if (target_desc.dirty)
+        if (target_desc->refbit)
+        {
+            target_desc->refbit = false;
+            continue;
+        }
+        if (target_desc->dirty)
         {
             // write this page to disk
-            auto writeResult = target_desc.file->writePage(target_desc.pageNo, &bufPool[clockHand]);
+            auto writeResult = target_desc->file->writePage(target_desc->pageNo, &bufPool[clockHand]);
             if (writeResult != OK)
             {
                 return writeResult;
             }
+            target_desc->dirty = false;
         }
 
-        frame = target_desc.frameNo;
         // remove from hashtable if there is already a valid page
-        if (target_desc.file != nullptr)
+        if (target_desc->file != nullptr)
         {
-            auto removeResult = hashTable->remove(target_desc.file, target_desc.pageNo);
-            if (removeResult != OK)
-            {
-                return removeResult;
-            }
+            hashTable->remove(target_desc->file, target_desc->pageNo);
+            // if (removeResult != OK)
+            // {
+            //     return removeResult;
+            // }
         }
-
+        frame = target_desc->frameNo;
         return OK;
-    }
-    return BUFFEREXCEEDED;
+    } while (true);
 }
+
 /*First check whether the page is already in the buffer pool by invoking the
 lookup() method on the hashtable to get a frame number.  There are two cases to
 be handled depending on the outcome of the lookup() call:
@@ -327,8 +336,12 @@ void BufMgr::printSelf(void)
              << "\tpinCnt: " << tmpbuf->pinCnt;
 
         if (tmpbuf->refbit == true)
+        {
             cout << "\tref";
-
+        }
+        else{
+            cout << "\t   ";
+        }
         if (tmpbuf->valid == true)
             cout << "\tvalid\n";
         cout << endl;

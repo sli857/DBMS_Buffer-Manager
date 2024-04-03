@@ -80,8 +80,7 @@ const Status BufMgr::allocBuf(int & frame)
     unsigned int pointer = clockHand;
     bool allocatedPage = false;
 
-    while(!allocatedPage)
-    {
+    do {
         //move forward the clock hand
         advanceClock();
 
@@ -93,30 +92,27 @@ const Status BufMgr::allocBuf(int & frame)
             if(bufTable[clockHand].refbit){// whether the frame is referenced
                 bufTable[clockHand].refbit = false; // unset the reference bit
             }else{ // a found free frame
-
+                allocatedPage = true;
                 if(bufTable[clockHand].valid){
+                    hashTable ->remove(bufTable[clockHand].file, bufTable[clockHand].pageNo);
                     if(bufTable[clockHand].dirty){
                         Status ioStatus = bufTable[clockHand].file ->writePage(bufTable[clockHand].pageNo, &bufPool[clockHand]);
                         if(ioStatus != OK){
                             return UNIXERR; // catch error
                         }
                         bufStats.diskwrites++; //write a dirty page back to disk successfully
-                        bufTable[clockHand].dirty = false; //Reset the dirty bit
+                        // bufTable[clockHand].dirty = false; //Reset the dirty bit
                     }
                 }
 
-                if(bufTable[clockHand].valid){
-                    hashTable ->remove(bufTable[clockHand].file, bufTable[clockHand].pageNo);
-                }
-
                 frame = clockHand;
-                allocatedPage = true;
+                bufTable[frame].Clear();
+                bufTable[clockHand].pinCnt = 1;
                 break;
             }
         }
-    }
+    }while(clockHand != pointer);
 
-    bufTable[frame].Clear();
     return OK;
 
     if (allocatedPage) {
@@ -223,7 +219,6 @@ const Status BufMgr::allocPage(File* file, int& pageNo, Page*& page)
     status = allocBuf(frameNo);
     if(status != OK){
         if(status == BUFFEREXCEEDED){
-            file->disposePage(pageNo);
             return BUFFEREXCEEDED;
         }else{
             return status;
